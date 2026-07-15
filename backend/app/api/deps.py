@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import AuthContext, authenticate_request
 from app.kafka.producer import EventPublisher
+from app.geo.service import GeoIntelligenceService
+from app.intelligence.services import IndustrialIntelligenceService
 from app.repositories.event_repository import EventRepository
 from app.services.event_normalization import EventNormalizationService
 from app.services.event_service import EventService
@@ -49,6 +51,14 @@ def get_risk_projection_service(request: Request):
 
 def get_graph_query_service(request: Request):
     return request.app.state.graph_query_service
+
+
+def get_intelligence_service(request: Request) -> IndustrialIntelligenceService:
+    return request.app.state.intelligence_service
+
+
+def get_geo_service(request: Request) -> GeoIntelligenceService:
+    return request.app.state.geo_service
 
 
 async def get_auth_context(auth_context: AuthContext = Depends(authenticate_request)) -> AuthContext:

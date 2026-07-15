@@ -26,6 +26,9 @@ from app.services.event_validation import EventValidationService
 from app.graph.repository import GraphRepository
 from app.graph.service import GraphQueryService
 from app.graph.synchronizer import GraphSynchronizer
+from app.geo.service import GeoIntelligenceService
+from app.intelligence.repositories import IntelligenceRepository
+from app.intelligence.services import IndustrialIntelligenceService
 from app.risk.projection import GeoSpatialProjectionService
 from app.risk.service import RiskService
 
@@ -61,6 +64,9 @@ async def lifespan(app: FastAPI):
     context_repository = ContextRepository()
     action_repository = ActionRepository()
     risk_service = RiskService(outbox_service, settings=settings)
+    intelligence_repository = IntelligenceRepository()
+    intelligence_service = IndustrialIntelligenceService(intelligence_repository)
+    geo_service = GeoIntelligenceService(GraphQueryService(graph_repository), risk_service, GeoSpatialProjectionService(GraphQueryService(graph_repository)))
     phase2_coordinator = Phase2Coordinator(
         twin_repository=twin_repository,
         context_repository=context_repository,
@@ -89,6 +95,9 @@ async def lifespan(app: FastAPI):
     app.state.graph_query_service = GraphQueryService(graph_repository)
     app.state.risk_service = risk_service
     app.state.risk_projection_service = GeoSpatialProjectionService(app.state.graph_query_service)
+    app.state.intelligence_repository = intelligence_repository
+    app.state.intelligence_service = intelligence_service
+    app.state.geo_service = geo_service
     app.state.replay_service = replay_service
     app.state.logger = logger
 

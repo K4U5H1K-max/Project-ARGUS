@@ -16,7 +16,10 @@ from app.actions.repositories import ActionRepository
 from app.context.repositories import ContextRepository
 from app.core.exceptions import register_exception_handlers
 from app.database.base import Base
+from app.geo.service import GeoIntelligenceService
 from app.digital_twin.repositories import TwinRepository
+from app.intelligence.repositories import IntelligenceRepository
+from app.intelligence.services import IndustrialIntelligenceService
 from app.risk.projection import GeoSpatialProjectionService
 from app.risk.service import RiskService
 from app.repositories.event_repository import EventRepository
@@ -142,6 +145,8 @@ def app(event_service: EventService, db_session_factory: async_sessionmaker[Asyn
     application.state.risk_service = risk_service
     application.state.risk_projection_service = risk_projection_service
     application.state.graph_query_service = mock_graph_query_service
+    application.state.intelligence_service = IndustrialIntelligenceService(IntelligenceRepository())
+    application.state.geo_service = GeoIntelligenceService(application.state.graph_query_service, risk_service, risk_projection_service)
     application.state.outbox_worker = None
     application.state.database = type(
         "DatabaseState",

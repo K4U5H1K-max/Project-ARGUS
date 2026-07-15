@@ -4,5 +4,6 @@ from app.digital_twin.models import EquipmentState, HazardState, MaintenanceStat
 from app.models.event import Event
 from app.reliability.models import AuditLog, OutboxMessage, ProcessedEvent
 from app.risk.models import RiskAssessment
+from app.intelligence.models import IntelligenceChunk, IntelligenceDocument
 
-__all__ = ["ActionEvent", "AuditLog", "ContextSnapshot", "EquipmentState", "Event", "HazardState", "MaintenanceState", "OutboxMessage", "PermitState", "PlantState", "ProcessedEvent", "RiskAssessment", "SensorState", "TwinStateSnapshot", "WorkerState", "ZoneState"]
+__all__ = ["ActionEvent", "AuditLog", "ContextSnapshot", "EquipmentState", "Event", "HazardState", "IntelligenceChunk", "IntelligenceDocument", "MaintenanceState", "OutboxMessage", "PermitState", "PlantState", "ProcessedEvent", "RiskAssessment", "SensorState", "TwinStateSnapshot", "WorkerState", "ZoneState"]

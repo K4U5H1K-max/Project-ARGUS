@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Dict
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -139,3 +139,36 @@ class ActionEngine:
                 )
             )
         return drafts
+
+class ActionPlanner:
+    def generate_plan(self, action_events: list[ActionObject], risk_assessment: RiskAssessment | None = None, playbook: Any = None) -> Dict[str, Any]:
+        plan = {
+            "plan_id": str(generate_uuid()),
+            "status": "DRAFT",
+            "actions": [],
+            "dependencies": [],
+            "deadlines": {},
+            "responsible_teams": {}
+        }
+        
+        for idx, event in enumerate(action_events):
+            action_item = {
+                "action_id": event.action_id,
+                "type": event.action_type,
+                "priority": event.priority
+            }
+            plan["actions"].append(action_item)
+            
+            # Simple deadline logic based on priority
+            deadline_minutes = 5 if event.priority == 1 else (15 if event.priority == 2 else 60)
+            plan["deadlines"][event.action_id] = f"{deadline_minutes}m"
+            
+            # Simple responsibility logic
+            team = "Safety Team" if "evacuate" in event.action_type.lower() else "Maintenance Team"
+            plan["responsible_teams"][event.action_id] = team
+            
+            # Simple dependency (sequential)
+            if idx > 0:
+                plan["dependencies"].append({"from": action_events[idx-1].action_id, "to": event.action_id})
+                
+        return plan

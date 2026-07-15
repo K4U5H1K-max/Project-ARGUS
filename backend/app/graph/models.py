@@ -6,13 +6,14 @@ from typing import Any
 
 
 class GraphNodeType(StrEnum):
-    PLANT = "Plant"; ZONE = "Zone"; EQUIPMENT = "Equipment"; WORKER = "Worker"; SENSOR = "Sensor"
+    PLANT = "Plant"; ZONE = "Zone"; EQUIPMENT = "Equipment"; WORKER = "Worker"; SENSOR = "Sensor"; CAMERA = "Camera"
     PERMIT = "Permit"; MAINTENANCE = "Maintenance"; HAZARD = "Hazard"; INCIDENT = "Incident"; SHIFT = "Shift"; EMERGENCY_TEAM = "EmergencyTeam"
 
 
 class GraphRelationshipType(StrEnum):
     LOCATED_IN = "LOCATED_IN"; WORKING_IN = "WORKING_IN"; MONITORS = "MONITORS"; CONNECTED_TO = "CONNECTED_TO"; ASSIGNED_TO = "ASSIGNED_TO"
     VALID_FOR = "VALID_FOR"; DETECTS = "DETECTS"; AFFECTED_BY = "AFFECTED_BY"; PART_OF = "PART_OF"; NEAR = "NEAR"; DEPENDS_ON = "DEPENDS_ON"
+    OBSERVES = "OBSERVES"
 
 
 @dataclass(frozen=True, slots=True)
