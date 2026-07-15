@@ -18,6 +18,7 @@ from app.reliability.outbox import OutboxService
 from app.reliability.repositories import OutboxRepository
 from app.reliability.repositories import ProcessedEventRepository
 from app.reliability.worker import OutboxPublisherWorker
+from app.reliability.replay import ReplayService
 from app.repositories.event_repository import EventRepository
 from app.services.event_normalization import EventNormalizationService
 from app.services.event_service import EventService
@@ -65,6 +66,7 @@ async def lifespan(app: FastAPI):
         processed_event_repository=processed_event_repository,
         phase2_coordinator=phase2_coordinator,
     )
+    replay_service = ReplayService(phase2_coordinator)
 
     app.state.settings = settings
     app.state.database = database
@@ -72,6 +74,7 @@ async def lifespan(app: FastAPI):
     app.state.outbox_worker = outbox_worker
     app.state.phase2_coordinator = phase2_coordinator
     app.state.event_service = service
+    app.state.replay_service = replay_service
     app.state.logger = logger
 
     logger.info("application_started", app_name=settings.app_name, env=settings.app_env)

@@ -10,6 +10,7 @@ from app.core.logging import get_logger
 from app.core.time import utcnow
 from app.kafka.producer import EventPublisher
 from app.reliability.repositories import OutboxRepository
+from app.reliability.metrics import OUTBOX_FAILED, OUTBOX_PENDING
 
 
 @dataclass(slots=True)
@@ -46,6 +47,7 @@ class OutboxPublisherWorker:
             try:
                 async with self.session_factory() as session:
                     await self._process_batch(session)
+                    OUTBOX_PENDING.set(await self.repository.backlog_count(session))
                     await session.commit()
                 self.status.last_run_at = utcnow()
             except Exception as exc:  # pragma: no cover - resilient background worker
@@ -65,6 +67,7 @@ class OutboxPublisherWorker:
                 backoff_seconds = min(2 ** attempts, 300)
                 if attempts >= message.max_attempts:
                     await self.repository.mark_dead_lettered(session, message.outbox_id, error=str(exc))
+                    OUTBOX_FAILED.inc()
                     self.logger.error("outbox_dead_lettered", outbox_id=str(message.outbox_id), error=str(exc))
                 else:
                     await self.repository.mark_retry(session, message.outbox_id, error=str(exc), attempts=attempts, backoff_seconds=backoff_seconds)

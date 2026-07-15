@@ -21,6 +21,7 @@ from app.schemas.event import EventCreateRequest, EventListResponse, EventRespon
 from app.services.event_normalization import EventNormalizationService
 from app.services.event_validation import EventValidationService
 from app.phase2.coordinator import Phase2Coordinator
+from app.reliability.metrics import DUPLICATE_EVENTS, EVENTS_FAILED, EVENTS_PROCESSED, EVENT_PROCESSING_DURATION
 
 
 class EventService:
@@ -74,23 +75,25 @@ class EventService:
             processing_version=1,
         )
 
-        async with session.begin():
-            processed = await self.processed_event_repository.create(
+        try:
+            with EVENT_PROCESSING_DURATION.labels(event_type=payload.event_type).time():
+                async with session.begin():
+                    # Persist the event first: the ledger has a real event foreign key.
+                    # The ledger's unique constraint is the atomic processing claim.
+                    stored = await self.repository.create(session, event)
+                    processed = await self.processed_event_repository.create(
                 session,
                 external_event_id=external_event_id,
                 source=payload.source,
-                event_id=str(event.event_id),
+                event_id=str(stored.event_id),
                 payload={"event": normalized_payload, "metadata": payload.metadata},
                 processing_version=1,
             )
-            if processed is None:
-                existing_event = await self.repository.get_by_external_event_id(session, payload.source, external_event_id)
-                if existing_event is not None:
-                    return self._to_response(existing_event)
-                return self._to_response(event)
+                    if processed is None:
+                        DUPLICATE_EVENTS.labels(source=payload.source).inc()
+                        return self._to_response(stored)
 
-            stored = await self.repository.create(session, event)
-            await self.outbox_service.enqueue(
+                    await self.outbox_service.enqueue(
                 session,
                 OutboxEnvelope(
                     topic="industrial.events",
@@ -103,10 +106,14 @@ class EventService:
                 ),
             )
 
-            if self.phase2_coordinator is not None:
-                await self.phase2_coordinator.handle_event(session, stored)
+                    if self.phase2_coordinator is not None:
+                        await self.phase2_coordinator.handle_event(session, stored, record_ledger=False)
+        except Exception:
+            EVENTS_FAILED.labels(source=payload.source, event_type=payload.event_type).inc()
+            raise
 
         self.logger.info("stored_event", event_id=str(stored.event_id))
+        EVENTS_PROCESSED.labels(source=payload.source, event_type=payload.event_type).inc()
         return self._to_response(stored)
 
     async def list_events(

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import delete, select
+from sqlalchemy import and_, delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.actions.models import ActionEvent
@@ -12,6 +12,7 @@ from app.context.models import ContextSnapshot
 from app.digital_twin.models import EquipmentState, HazardState, MaintenanceState, PermitState, PlantState, SensorState, TwinStateSnapshot, WorkerState, ZoneState
 from app.models.event import Event
 from app.phase2.coordinator import Phase2Coordinator
+from app.reliability.metrics import REPLAY_DURATION
 
 
 @dataclass(slots=True)
@@ -39,7 +40,10 @@ class ReplayService:
         if request.replay_until is not None:
             statement = statement.where(Event.timestamp <= request.replay_until)
         if request.replay_until_event_id is not None:
-            statement = statement.where(Event.event_id <= request.replay_until_event_id)
+            target = await session.get(Event, request.replay_until_event_id)
+            if target is None or target.plant_id != request.plant_id:
+                raise ValueError("Replay cutoff event does not belong to the selected plant")
+            statement = statement.where(or_(Event.timestamp < target.timestamp, and_(Event.timestamp == target.timestamp, Event.event_id <= target.event_id)))
 
         events = list((await session.execute(statement)).scalars().all())
 
@@ -47,9 +51,11 @@ class ReplayService:
             await self._reset_plant_state(session, request.plant_id)
 
         processed = 0
-        for event in events:
-            await self.phase2_coordinator.handle_event(session, event)
-            processed += 1
+        with REPLAY_DURATION.labels(plant_id=request.plant_id).time():
+            for event in events:
+                # Replays rebuild projections; historical ledger claims must not suppress them.
+                await self.phase2_coordinator.handle_event(session, event, record_ledger=False)
+                processed += 1
 
         return ReplayResult(processed_events=processed, rebuilt_contexts=processed, rebuilt_actions=processed)
 
