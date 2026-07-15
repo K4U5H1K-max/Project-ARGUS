@@ -23,6 +23,9 @@ from app.repositories.event_repository import EventRepository
 from app.services.event_normalization import EventNormalizationService
 from app.services.event_service import EventService
 from app.services.event_validation import EventValidationService
+from app.graph.repository import GraphRepository
+from app.graph.service import GraphQueryService
+from app.graph.synchronizer import GraphSynchronizer
 
 
 @asynccontextmanager
@@ -41,6 +44,9 @@ async def lifespan(app: FastAPI):
     await kafka_producer.start()
 
     outbox_repository = OutboxRepository()
+    graph_repository = GraphRepository(settings.neo4j_uri, settings.neo4j_username, settings.neo4j_password, settings.neo4j_database)
+    await graph_repository.bootstrap()
+    graph_synchronizer = GraphSynchronizer(graph_repository)
     outbox_service = OutboxService(outbox_repository)
     outbox_worker = OutboxPublisherWorker(session_factory=database.session_factory, publisher=kafka_producer, repository=outbox_repository)
     await outbox_worker.start()
@@ -57,6 +63,7 @@ async def lifespan(app: FastAPI):
         context_repository=context_repository,
         action_repository=action_repository,
         outbox_service=outbox_service,
+        graph_synchronizer=graph_synchronizer,
     )
     service = EventService(
         repository=repository,
@@ -74,6 +81,8 @@ async def lifespan(app: FastAPI):
     app.state.outbox_worker = outbox_worker
     app.state.phase2_coordinator = phase2_coordinator
     app.state.event_service = service
+    app.state.graph_repository = graph_repository
+    app.state.graph_query_service = GraphQueryService(graph_repository)
     app.state.replay_service = replay_service
     app.state.logger = logger
 
@@ -82,6 +91,7 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         await outbox_worker.stop()
+        await graph_repository.close()
         await kafka_producer.stop()
         await database.stop()
         logger.info("application_stopped")

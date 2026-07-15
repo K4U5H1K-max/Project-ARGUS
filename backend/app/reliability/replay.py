@@ -54,7 +54,7 @@ class ReplayService:
         with REPLAY_DURATION.labels(plant_id=request.plant_id).time():
             for event in events:
                 # Replays rebuild projections; historical ledger claims must not suppress them.
-                await self.phase2_coordinator.handle_event(session, event, record_ledger=False)
+                await self.phase2_coordinator.handle_event(session, event, record_ledger=False, replay=True)
                 processed += 1
 
         return ReplayResult(processed_events=processed, rebuilt_contexts=processed, rebuilt_actions=processed)

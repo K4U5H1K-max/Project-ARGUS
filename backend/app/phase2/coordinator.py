@@ -17,6 +17,7 @@ from app.digital_twin.state_manager import StateManager
 from app.reliability.outbox import OutboxEnvelope, OutboxService
 from app.reliability.repositories import ProcessedEventRepository
 from app.models.event import Event
+from app.graph.synchronizer import GraphSynchronizer
 
 
 @dataclass(slots=True)
@@ -26,7 +27,7 @@ class Phase2Outcome:
 
 
 class Phase2Coordinator:
-    def __init__(self, *, twin_repository: TwinRepository, context_repository: ContextRepository, action_repository: ActionRepository, outbox_service: OutboxService) -> None:
+    def __init__(self, *, twin_repository: TwinRepository, context_repository: ContextRepository, action_repository: ActionRepository, outbox_service: OutboxService, graph_synchronizer: GraphSynchronizer | None = None) -> None:
         self.state_manager = StateManager(ProcessorRegistry())
         self.context_engine = ContextEngine(twin_repository=twin_repository, context_repository=context_repository)
         self.action_engine = ActionEngine(repository=action_repository, registry=RuleRegistry(), outbox_service=outbox_service)
@@ -34,10 +35,11 @@ class Phase2Coordinator:
         self.context_repository = context_repository
         self.action_repository = action_repository
         self.outbox_service = outbox_service
+        self.graph_synchronizer = graph_synchronizer
         self.processed_event_repository = ProcessedEventRepository()
         self.logger = get_logger(__name__)
 
-    async def handle_event(self, session: AsyncSession, event: Event, *, record_ledger: bool = True) -> Phase2Outcome:
+    async def handle_event(self, session: AsyncSession, event: Event, *, record_ledger: bool = True, replay: bool = False) -> Phase2Outcome:
         external_event_id = event.external_event_id or str(event.event_id)
         if record_ledger:
             processed = await self.processed_event_repository.create(
@@ -54,6 +56,8 @@ class Phase2Coordinator:
                 return Phase2Outcome(context_id=existing.trace.get("context_id", "") if existing else "", action_count=0)
 
         await self.state_manager.apply_event(session, event)
+        if self.graph_synchronizer is not None:
+            await self.graph_synchronizer.synchronize_event(event, replay=replay)
         context, snapshot = await self.context_engine.build_context(session, event)
         await self.context_repository.create(session, snapshot)
         await self.outbox_service.enqueue(
