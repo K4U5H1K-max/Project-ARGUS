@@ -1,0 +1,34 @@
+[tool.poetry]
+name = "project-argus-backend"
+version = "0.1.0"
+description = "AI-Powered Industrial Safety Intelligence Platform backend"
+authors = ["GitHub Copilot"]
+readme = "README.md"
+packages = [{ include = "app" }]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = "^0.115.0"
+uvicorn = { version = "^0.30.0", extras = ["standard"] }
+sqlalchemy = { version = "^2.0.30", extras = ["asyncio"] }
+asyncpg = "^0.29.0"
+alembic = "^1.13.2"
+pydantic = "^2.8.2"
+pydantic-settings = "^2.3.4"
+aiokafka = "^0.10.0"
+structlog = "^24.2.0"
+orjson = "^3.10.6"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.2"
+pytest-asyncio = "^0.23.8"
+httpx = "^0.27.0"
+aiosqlite = "^0.20.0"
+
+[build-system]
+requires = ["poetry-core>=1.9.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

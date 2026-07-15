@@ -1,0 +1,16 @@
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, Request
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.deps import get_db_session
+
+router = APIRouter(tags=["health"])
+
+
+@router.get("/health")
+async def health_check(request: Request, session: AsyncSession = Depends(get_db_session)) -> dict[str, str]:
+    await session.execute(text("SELECT 1"))
+    kafka_status = "healthy" if request.app.state.kafka_producer.is_ready else "degraded"
+    return {"status": "ok", "database": "healthy", "kafka": kafka_status}

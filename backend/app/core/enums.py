@@ -1,0 +1,29 @@
+from __future__ import annotations
+
+from enum import StrEnum
+
+
+class EventType(StrEnum):
+    GAS_SENSOR = "GAS_SENSOR"
+    TEMPERATURE_SENSOR = "TEMPERATURE_SENSOR"
+    PRESSURE_SENSOR = "PRESSURE_SENSOR"
+    VIBRATION_SENSOR = "VIBRATION_SENSOR"
+    HOT_WORK = "HOT_WORK"
+    CONFINED_SPACE = "CONFINED_SPACE"
+    ELECTRICAL = "ELECTRICAL"
+    EXCAVATION = "EXCAVATION"
+    ENTRY = "ENTRY"
+    EXIT = "EXIT"
+    PPE_VIOLATION = "PPE_VIOLATION"
+    START = "START"
+    COMPLETE = "COMPLETE"
+    FIRE = "FIRE"
+    LEAK = "LEAK"
+    EXPLOSION = "EXPLOSION"
+    NEAR_MISS = "NEAR_MISS"
+
+
+class EventSeverity(StrEnum):
+    INFO = "INFO"
+    WARNING = "WARNING"
+    CRITICAL = "CRITICAL"
