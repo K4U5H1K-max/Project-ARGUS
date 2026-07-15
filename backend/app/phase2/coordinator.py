@@ -18,6 +18,7 @@ from app.reliability.outbox import OutboxEnvelope, OutboxService
 from app.reliability.repositories import ProcessedEventRepository
 from app.models.event import Event
 from app.graph.synchronizer import GraphSynchronizer
+from app.risk.service import RiskService
 
 
 @dataclass(slots=True)
@@ -27,7 +28,7 @@ class Phase2Outcome:
 
 
 class Phase2Coordinator:
-    def __init__(self, *, twin_repository: TwinRepository, context_repository: ContextRepository, action_repository: ActionRepository, outbox_service: OutboxService, graph_synchronizer: GraphSynchronizer | None = None) -> None:
+    def __init__(self, *, twin_repository: TwinRepository, context_repository: ContextRepository, action_repository: ActionRepository, outbox_service: OutboxService, graph_synchronizer: GraphSynchronizer | None = None, risk_service: RiskService | None = None) -> None:
         self.state_manager = StateManager(ProcessorRegistry())
         self.context_engine = ContextEngine(twin_repository=twin_repository, context_repository=context_repository)
         self.action_engine = ActionEngine(repository=action_repository, registry=RuleRegistry(), outbox_service=outbox_service)
@@ -36,6 +37,7 @@ class Phase2Coordinator:
         self.action_repository = action_repository
         self.outbox_service = outbox_service
         self.graph_synchronizer = graph_synchronizer
+        self.risk_service = risk_service or RiskService(outbox_service)
         self.processed_event_repository = ProcessedEventRepository()
         self.logger = get_logger(__name__)
 
@@ -60,6 +62,7 @@ class Phase2Coordinator:
             await self.graph_synchronizer.synchronize_event(event, replay=replay)
         context, snapshot = await self.context_engine.build_context(session, event)
         await self.context_repository.create(session, snapshot)
+        await self.risk_service.assess(session, context=context, event=event, graph_revision=event.processing_version, twin_revision=event.processing_version)
         await self.outbox_service.enqueue(
             session,
             OutboxEnvelope(

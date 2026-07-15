@@ -50,8 +50,9 @@ class ContextEngine:
         sensors = await self.twin_repository.list_recent_sensor_states_by_zone(session, zone_id)
         weather = await self.weather_provider.get_current_weather(plant_id=plant_id, zone_id=zone_id)
 
+        context_id = str(generate_uuid())
         context = ContextObject(
-            context_id=snapshot.context_id,
+            context_id=context_id,
             plant_id=plant_id,
             zone_id=zone_id,
             event_id=str(event.event_id),
@@ -70,7 +71,7 @@ class ContextEngine:
         )
 
         snapshot = ContextSnapshot(
-            context_id=str(generate_uuid()),
+            context_id=context_id,
             event_id=str(event.event_id),
             plant_id=plant_id,
             zone_id=zone_id,
