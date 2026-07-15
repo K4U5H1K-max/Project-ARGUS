@@ -17,7 +17,6 @@ from app.digital_twin.state_manager import StateManager
 from app.reliability.outbox import OutboxEnvelope, OutboxService
 from app.reliability.repositories import ProcessedEventRepository
 from app.models.event import Event
-from app.graph.synchronizer import GraphSynchronizer
 from app.risk.service import RiskService
 
 
@@ -28,7 +27,7 @@ class Phase2Outcome:
 
 
 class Phase2Coordinator:
-    def __init__(self, *, twin_repository: TwinRepository, context_repository: ContextRepository, action_repository: ActionRepository, outbox_service: OutboxService, graph_synchronizer: GraphSynchronizer | None = None, risk_service: RiskService | None = None) -> None:
+    def __init__(self, *, twin_repository: TwinRepository, context_repository: ContextRepository, action_repository: ActionRepository, outbox_service: OutboxService, graph_synchronizer: object | None = None, risk_service: RiskService | None = None) -> None:
         self.state_manager = StateManager(ProcessorRegistry())
         self.context_engine = ContextEngine(twin_repository=twin_repository, context_repository=context_repository)
         self.action_engine = ActionEngine(repository=action_repository, registry=RuleRegistry(), outbox_service=outbox_service)
@@ -62,7 +61,13 @@ class Phase2Coordinator:
             await self.graph_synchronizer.synchronize_event(event, replay=replay)
         context, snapshot = await self.context_engine.build_context(session, event)
         await self.context_repository.create(session, snapshot)
-        await self.risk_service.assess(session, context=context, event=event, graph_revision=event.processing_version, twin_revision=event.processing_version)
+        assessment = await self.risk_service.assess(
+            session,
+            context=context,
+            event=event,
+            graph_revision=event.processing_version,
+            twin_revision=event.processing_version,
+        )
         await self.outbox_service.enqueue(
             session,
             OutboxEnvelope(
@@ -81,5 +86,5 @@ class Phase2Coordinator:
                 headers={"source_event_id": str(event.event_id), "context_id": snapshot.context_id},
             ),
         )
-        actions = await self.action_engine.evaluate(session, context=context, event=event)
+        actions = await self.action_engine.evaluate(session, context=context, event=event, risk_assessment=assessment)
         return Phase2Outcome(context_id=snapshot.context_id, action_count=len(actions))

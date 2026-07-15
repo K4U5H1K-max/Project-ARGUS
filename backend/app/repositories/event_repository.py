@@ -28,7 +28,7 @@ class EventRepository:
             "payload": event.payload,
             "metadata": event.event_metadata,
             "event_hash": event.event_hash,
-            "processing_version": event.processing_version,
+            "processing_version": event.processing_version or 1,
         }
 
         if dialect_name == "postgresql":

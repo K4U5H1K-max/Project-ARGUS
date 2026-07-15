@@ -1,6 +1,39 @@
 from __future__ import annotations
 
-from prometheus_client import Counter, Gauge, Histogram
+from contextlib import nullcontext
+
+try:
+	from prometheus_client import Counter, Gauge, Histogram
+except ModuleNotFoundError:  # pragma: no cover - fallback for constrained local environments
+	class _NoOpMetric:
+		def __init__(self, *args, **kwargs):
+			self._labels = {}
+
+		def labels(self, **kwargs):
+			key = tuple(sorted(kwargs.items()))
+			metric = self._labels.get(key)
+			if metric is None:
+				metric = self.__class__()
+				self._labels[key] = metric
+			return metric
+
+		def inc(self, amount: float = 1.0) -> None:
+			return None
+
+		def set(self, value: float) -> None:
+			return None
+
+		def time(self):
+			return nullcontext()
+
+	class Counter(_NoOpMetric):
+		pass
+
+	class Gauge(_NoOpMetric):
+		pass
+
+	class Histogram(_NoOpMetric):
+		pass
 
 EVENTS_PROCESSED = Counter("events_processed_total", "Events successfully processed", ["source", "event_type"])
 EVENTS_FAILED = Counter("events_failed_total", "Events which failed processing", ["source", "event_type"])
@@ -26,3 +59,18 @@ GRAPH_REPLAY_DURATION = Histogram("graph_replay_duration_seconds", "Replay graph
 GRAPH_REVISION_LAG = Gauge("graph_revision_lag", "Twin to graph revision lag", ["plant_id"])
 GRAPH_FAILED_RECOVERIES = Counter("graph_failed_recoveries_total", "Failed graph recoveries")
 GRAPH_TEMPORAL_RELATIONSHIPS = Counter("graph_temporal_relationships_total", "Temporal relationship versions", ["relationship_type"])
+RISK_ASSESSMENTS = Counter("risk_assessments_total", "Persisted risk assessments", ["level"])
+RISK_RULE_MATCHES = Counter("risk_rule_matches_total", "Matched deterministic risk rules", ["rule_id"])
+RISK_ENGINE_LATENCY = Histogram("risk_engine_latency_seconds", "Risk assessment duration")
+RISK_ENGINE_DURATION = Histogram("risk_engine_duration_seconds", "Risk engine end-to-end duration")
+RISK_RULE_DURATION = Histogram("risk_rule_duration_seconds", "Risk rule evaluation duration", ["rule_id"])
+RISK_LEVEL = Gauge("risk_level_total", "Current risk assessment count by level", ["level"])
+CRITICAL_RISKS = Gauge("critical_risk_total", "Current critical risks")
+ACTIVE_RISKS = Gauge("active_risks_total", "Current active risks")
+AGGREGATION_DURATION = Histogram("aggregation_duration_seconds", "Risk aggregation duration")
+TIMELINE_LATENCY = Histogram("timeline_latency_seconds", "Risk timeline query duration")
+HEATMAP_REQUESTS = Counter("heatmap_requests_total", "Risk map projection requests")
+RISK_TIMELINE_QUERIES = Counter("timeline_queries_total", "Risk timeline and history requests")
+RISK_DISTRIBUTION = Counter("risk_distribution_total", "Risk assessments by distribution bucket", ["level"])
+ACTIONS_GENERATED = Counter("actions_generated_total", "Generated actions from risk assessments")
+RECOMMENDATIONS_GENERATED = Counter("recommendations_generated_total", "Generated deterministic recommendations")

@@ -1,2 +1,1 @@
-from app.risk.service import RiskService
-__all__ = ["RiskService"]
+__all__: list[str] = []

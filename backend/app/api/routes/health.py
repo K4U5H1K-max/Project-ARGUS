@@ -29,6 +29,9 @@ async def health_check(request: Request, response: Response, session: AsyncSessi
             graph_ok = graph_bootstrapped = True
         except Exception:
             graph_ok = False
+    else:
+        graph_ok = True
+        graph_bootstrapped = True
     healthy = database_ok and kafka_ok and graph_ok
     response.status_code = status.HTTP_200_OK if healthy else status.HTTP_503_SERVICE_UNAVAILABLE
     return {"status": "ok" if healthy else "degraded", "database": database_ok, "kafka": kafka_ok, "outbox_worker": worker_ok, "replay_service": replay_ok, "neo4j": graph_ok, "graph_bootstrap": graph_bootstrapped}

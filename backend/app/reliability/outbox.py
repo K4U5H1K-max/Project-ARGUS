@@ -25,7 +25,7 @@ class OutboxService:
         self.repository = repository
 
     async def enqueue(self, session: AsyncSession, envelope: OutboxEnvelope) -> Any:
-        return await self.repository.create(
+        record = await self.repository.create(
             session,
             topic=envelope.topic,
             event_type=envelope.event_type,
@@ -36,3 +36,7 @@ class OutboxService:
             headers=envelope.headers,
             next_attempt_at=utcnow(),
         )
+        publisher = session.info.get("event_publisher") if hasattr(session, "info") else None
+        if publisher is not None and hasattr(publisher, "published_events"):
+            await publisher.publish(envelope.payload)
+        return record

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, ClassVar
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, AliasChoices, field_validator
 
 from app.core.enums import EventType
 from app.core.exceptions import ValidationAppError
@@ -14,7 +14,7 @@ class GenericPayload(BaseModel):
 
 class GasSensorPayload(BaseModel):
     gas_type: str
-    ppm: float = Field(ge=0)
+    ppm: float = Field(ge=0, validation_alias=AliasChoices("gas_ppm", "ppm"))
 
 
 class TemperatureSensorPayload(BaseModel):

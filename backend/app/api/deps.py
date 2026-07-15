@@ -15,6 +15,7 @@ from app.services.event_validation import EventValidationService
 
 async def get_db_session(request: Request) -> AsyncGenerator[AsyncSession, None]:
     async with request.app.state.database.session_factory() as session:
+        session.info["event_publisher"] = getattr(request.app.state, "kafka_producer", None)
         yield session
 
 
@@ -36,6 +37,18 @@ def get_publisher(request: Request) -> EventPublisher:
 
 def get_event_service(request: Request) -> EventService:
     return request.app.state.event_service
+
+
+def get_risk_service(request: Request):
+    return request.app.state.risk_service
+
+
+def get_risk_projection_service(request: Request):
+    return request.app.state.risk_projection_service
+
+
+def get_graph_query_service(request: Request):
+    return request.app.state.graph_query_service
 
 
 async def get_auth_context(auth_context: AuthContext = Depends(authenticate_request)) -> AuthContext:

@@ -14,6 +14,7 @@ class GraphSynchronizer:
     async def synchronize_event(self, event: Event, *, replay: bool = False) -> None:
         revision = event.processing_version
         timer = GRAPH_REPLAY_DURATION.time() if replay else GRAPH_SYNC_DURATION.time()
+        checkpoint = getattr(self.repository, "checkpoint", None)
         with timer:
             try:
                 plant = GraphNode(GraphNodeType.PLANT, event.plant_id, {"plant_id": event.plant_id})
@@ -47,9 +48,11 @@ class GraphSynchronizer:
                     await self.repository.upsert_relationship(relationship, revision=revision, event_id=str(event.event_id), occurred_at=event.timestamp)
                     GRAPH_TEMPORAL_RELATIONSHIPS.labels(relationship_type=relationship.relationship_type.value).inc()
                 await self.repository.create_revision(event_id=str(event.event_id), plant_id=event.plant_id, revision=revision, replay=replay)
-                await self.repository.checkpoint(plant_id=event.plant_id, graph_revision=revision, twin_revision=revision, event_id=str(event.event_id), status="SYNCED")
+                if callable(checkpoint):
+                    await checkpoint(plant_id=event.plant_id, graph_revision=revision, twin_revision=revision, event_id=str(event.event_id), status="SYNCED")
                 GRAPH_UPDATES.labels(result="success").inc(); GRAPH_SYNC_SUCCESS.inc()
             except Exception:
                 GRAPH_UPDATES.labels(result="failure").inc(); GRAPH_SYNC_FAILURE.inc()
-                await self.repository.checkpoint(plant_id=event.plant_id, graph_revision=revision, twin_revision=revision, event_id=str(event.event_id), status="FAILED")
+                if callable(checkpoint):
+                    await checkpoint(plant_id=event.plant_id, graph_revision=revision, twin_revision=revision, event_id=str(event.event_id), status="FAILED")
                 raise

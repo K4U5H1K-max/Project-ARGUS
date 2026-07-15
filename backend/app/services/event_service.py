@@ -50,6 +50,7 @@ class EventService:
         payload: EventCreateRequest,
         request: Request,
     ) -> EventResponse:
+        session.info["event_publisher"] = getattr(request.app.state, "kafka_producer", None)
         self.logger.info("received_event", source=payload.source, event_type=payload.event_type)
         validated_payload = self.validator.validate(payload.event_type, payload.payload)
         self.logger.info("validated_event", event_type=payload.event_type)

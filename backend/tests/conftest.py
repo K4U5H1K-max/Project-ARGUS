@@ -17,6 +17,8 @@ from app.context.repositories import ContextRepository
 from app.core.exceptions import register_exception_handlers
 from app.database.base import Base
 from app.digital_twin.repositories import TwinRepository
+from app.risk.projection import GeoSpatialProjectionService
+from app.risk.service import RiskService
 from app.repositories.event_repository import EventRepository
 from app.schemas.event import EventCreateRequest
 from app.phase2.coordinator import Phase2Coordinator
@@ -27,6 +29,20 @@ from app.reliability.worker import OutboxPublisherWorker
 from app.services.event_normalization import EventNormalizationService
 from app.services.event_service import EventService
 from app.services.event_validation import EventValidationService
+
+
+class MockGraphQueryService:
+    async def node(self, node_type: str, node_id: str):
+        return [{"n": {"node_type": node_type, "node_id": node_id, "properties": {"coordinates": [12.0, 48.0]}}}]
+
+    async def worker_exposure(self, worker_id: str):
+        return [{"asset": {"node_type": "Equipment", "node_id": f"eq-{worker_id}", "properties": {"coordinates": [12.1, 48.1]}}}]
+
+    async def impact(self, node_id: str):
+        return [{"impact": {"node_type": "Equipment", "node_id": f"impact-{node_id}", "properties": {"coordinates": [12.2, 48.2]}}}]
+
+    async def zone_graph(self, zone_id: str):
+        return [{"z": {"node_type": "Zone", "node_id": zone_id, "properties": {"coordinates": [12.3, 48.3]}}}]
 
 
 class MockKafkaPublisher:
@@ -89,6 +105,21 @@ def phase2_coordinator(outbox_service: OutboxService) -> Phase2Coordinator:
 
 
 @pytest.fixture()
+def mock_graph_query_service() -> MockGraphQueryService:
+    return MockGraphQueryService()
+
+
+@pytest.fixture()
+def risk_service(outbox_service: OutboxService) -> RiskService:
+    return RiskService(outbox_service)
+
+
+@pytest.fixture()
+def risk_projection_service(mock_graph_query_service: MockGraphQueryService) -> GeoSpatialProjectionService:
+    return GeoSpatialProjectionService(mock_graph_query_service)
+
+
+@pytest.fixture()
 def event_service(phase2_coordinator: Phase2Coordinator, outbox_service: OutboxService) -> EventService:
     return EventService(
         repository=EventRepository(),
@@ -101,13 +132,16 @@ def event_service(phase2_coordinator: Phase2Coordinator, outbox_service: OutboxS
 
 
 @pytest.fixture()
-def app(event_service: EventService, db_session_factory: async_sessionmaker[AsyncSession], mock_publisher: MockKafkaPublisher, phase2_coordinator: Phase2Coordinator) -> FastAPI:
+def app(event_service: EventService, db_session_factory: async_sessionmaker[AsyncSession], mock_publisher: MockKafkaPublisher, phase2_coordinator: Phase2Coordinator, risk_service: RiskService, risk_projection_service: GeoSpatialProjectionService, mock_graph_query_service: MockGraphQueryService) -> FastAPI:
     application = FastAPI()
     register_exception_handlers(application)
     application.include_router(api_router)
     application.state.kafka_producer = mock_publisher
     application.state.event_service = event_service
     application.state.phase2_coordinator = phase2_coordinator
+    application.state.risk_service = risk_service
+    application.state.risk_projection_service = risk_projection_service
+    application.state.graph_query_service = mock_graph_query_service
     application.state.outbox_worker = None
     application.state.database = type(
         "DatabaseState",
