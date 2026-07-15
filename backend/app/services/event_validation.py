@@ -47,6 +47,18 @@ class VisionDetectionPayload(BaseModel):
     label: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
+class PredictionPayload(BaseModel):
+    prediction_id: str
+    horizon_minutes: int
+    predicted_risk_level: str
+    confidence: float
+    simulated_events: list[dict[str, Any]] = Field(default_factory=list)
+
+class SimulationPayload(BaseModel):
+    simulation_id: str
+    scenario: str
+    outcomes: dict[str, Any]
+
 class EventValidationService:
     _registry: ClassVar[dict[EventType, type[BaseModel]]] = {
         EventType.GAS_SENSOR: GasSensorPayload,
@@ -62,6 +74,9 @@ class EventValidationService:
         EventType.VEHICLE_DETECTED: VisionDetectionPayload,
         EventType.WORKER_FALL: VisionDetectionPayload,
         EventType.PPE_VIOLATION: VisionDetectionPayload,
+        EventType.PREDICTION_GENERATED: PredictionPayload,
+        EventType.ANOMALY_FORECAST: PredictionPayload,
+        EventType.STATE_SIMULATION_COMPLETED: SimulationPayload,
     }
     def validate(self, event_type: EventType, payload: dict[str, Any]) -> dict[str, Any]:
         model = self._registry.get(event_type, GenericPayload)
