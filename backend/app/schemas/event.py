@@ -12,6 +12,7 @@ from app.core.enums import EventSeverity, EventType
 class EventCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    external_event_id: str | None = None
     timestamp: datetime | None = None
     source: str
     event_type: EventType
@@ -28,6 +29,7 @@ class EventResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True, extra="ignore")
 
     event_id: UUID
+    external_event_id: str | None = None
     timestamp: datetime
     source: str
     event_type: EventType

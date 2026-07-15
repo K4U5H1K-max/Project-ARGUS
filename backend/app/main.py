@@ -5,11 +5,19 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.api.router import api_router
+from app.actions.repositories import ActionRepository
+from app.context.repositories import ContextRepository
 from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging, get_logger
 from app.database.session import DatabaseManager
 from app.kafka.producer import AIOKafkaEventPublisher
+from app.digital_twin.repositories import TwinRepository
+from app.phase2.coordinator import Phase2Coordinator
+from app.reliability.outbox import OutboxService
+from app.reliability.repositories import OutboxRepository
+from app.reliability.repositories import ProcessedEventRepository
+from app.reliability.worker import OutboxPublisherWorker
 from app.repositories.event_repository import EventRepository
 from app.services.event_normalization import EventNormalizationService
 from app.services.event_service import EventService
@@ -31,19 +39,38 @@ async def lifespan(app: FastAPI):
     )
     await kafka_producer.start()
 
+    outbox_repository = OutboxRepository()
+    outbox_service = OutboxService(outbox_repository)
+    outbox_worker = OutboxPublisherWorker(session_factory=database.session_factory, publisher=kafka_producer, repository=outbox_repository)
+    await outbox_worker.start()
+
     repository = EventRepository()
     validator = EventValidationService()
     normalizer = EventNormalizationService()
+    processed_event_repository = ProcessedEventRepository()
+    twin_repository = TwinRepository()
+    context_repository = ContextRepository()
+    action_repository = ActionRepository()
+    phase2_coordinator = Phase2Coordinator(
+        twin_repository=twin_repository,
+        context_repository=context_repository,
+        action_repository=action_repository,
+        outbox_service=outbox_service,
+    )
     service = EventService(
         repository=repository,
         validator=validator,
         normalizer=normalizer,
-        publisher=kafka_producer,
+        outbox_service=outbox_service,
+        processed_event_repository=processed_event_repository,
+        phase2_coordinator=phase2_coordinator,
     )
 
     app.state.settings = settings
     app.state.database = database
     app.state.kafka_producer = kafka_producer
+    app.state.outbox_worker = outbox_worker
+    app.state.phase2_coordinator = phase2_coordinator
     app.state.event_service = service
     app.state.logger = logger
 
@@ -51,6 +78,7 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
+        await outbox_worker.stop()
         await kafka_producer.stop()
         await database.stop()
         logger.info("application_stopped")

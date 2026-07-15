@@ -31,6 +31,11 @@ class KafkaPublishError(AppError):
         super().__init__("kafka_publish_error", message, details=details, status_code=502)
 
 
+class ConcurrencyError(AppError):
+    def __init__(self, message: str, *, details: Any | None = None) -> None:
+        super().__init__("concurrency_error", message, details=details, status_code=409)
+
+
 def error_response(code: str, message: str, *, details: Any | None = None) -> dict[str, Any]:
     return {"error": {"code": code, "message": message, "details": details}}
 

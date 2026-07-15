@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.core.config import get_settings
 from app.database.base import Base
-from app.models import Event
+from app.models import *  # noqa: F401,F403
 
 config = context.config
 

@@ -9,19 +9,27 @@ from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+import app.models  # noqa: F401
 from app.api.deps import get_db_session, get_event_service
 from app.api.router import api_router
+from app.actions.repositories import ActionRepository
+from app.context.repositories import ContextRepository
 from app.core.exceptions import register_exception_handlers
 from app.database.base import Base
-from app.kafka.producer import EventPublisher
+from app.digital_twin.repositories import TwinRepository
 from app.repositories.event_repository import EventRepository
 from app.schemas.event import EventCreateRequest
+from app.phase2.coordinator import Phase2Coordinator
+from app.reliability.outbox import OutboxService
+from app.reliability.repositories import OutboxRepository
+from app.reliability.repositories import ProcessedEventRepository
+from app.reliability.worker import OutboxPublisherWorker
 from app.services.event_normalization import EventNormalizationService
 from app.services.event_service import EventService
 from app.services.event_validation import EventValidationService
 
 
-class MockKafkaPublisher(EventPublisher):
+class MockKafkaPublisher:
     def __init__(self) -> None:
         self.is_ready = True
         self.published_events: list[dict[str, object]] = []
@@ -61,22 +69,46 @@ def mock_publisher() -> MockKafkaPublisher:
 
 
 @pytest.fixture()
-def event_service(mock_publisher: MockKafkaPublisher) -> EventService:
-    return EventService(
-        repository=EventRepository(),
-        validator=EventValidationService(),
-        normalizer=EventNormalizationService(),
-        publisher=mock_publisher,
+def outbox_repository() -> OutboxRepository:
+    return OutboxRepository()
+
+
+@pytest.fixture()
+def outbox_service(outbox_repository: OutboxRepository) -> OutboxService:
+    return OutboxService(outbox_repository)
+
+
+@pytest.fixture()
+def phase2_coordinator(outbox_service: OutboxService) -> Phase2Coordinator:
+    return Phase2Coordinator(
+        twin_repository=TwinRepository(),
+        context_repository=ContextRepository(),
+        action_repository=ActionRepository(),
+        outbox_service=outbox_service,
     )
 
 
 @pytest.fixture()
-def app(event_service: EventService, db_session_factory: async_sessionmaker[AsyncSession], mock_publisher: MockKafkaPublisher) -> FastAPI:
+def event_service(phase2_coordinator: Phase2Coordinator, outbox_service: OutboxService) -> EventService:
+    return EventService(
+        repository=EventRepository(),
+        validator=EventValidationService(),
+        normalizer=EventNormalizationService(),
+        outbox_service=outbox_service,
+        processed_event_repository=ProcessedEventRepository(),
+        phase2_coordinator=phase2_coordinator,
+    )
+
+
+@pytest.fixture()
+def app(event_service: EventService, db_session_factory: async_sessionmaker[AsyncSession], mock_publisher: MockKafkaPublisher, phase2_coordinator: Phase2Coordinator) -> FastAPI:
     application = FastAPI()
     register_exception_handlers(application)
-    application.include_router(api_router, prefix="/api/v1")
+    application.include_router(api_router)
     application.state.kafka_producer = mock_publisher
     application.state.event_service = event_service
+    application.state.phase2_coordinator = phase2_coordinator
+    application.state.outbox_worker = None
     application.state.database = type(
         "DatabaseState",
         (),

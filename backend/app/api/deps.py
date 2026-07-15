@@ -5,7 +5,7 @@ from collections.abc import AsyncGenerator
 from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import AuthContext, authenticate_stub
+from app.core.auth import AuthContext, authenticate_request
 from app.kafka.producer import EventPublisher
 from app.repositories.event_repository import EventRepository
 from app.services.event_normalization import EventNormalizationService
@@ -38,5 +38,5 @@ def get_event_service(request: Request) -> EventService:
     return request.app.state.event_service
 
 
-async def get_auth_context(_: AuthContext = Depends(authenticate_stub)) -> AuthContext:
-    return AuthContext(system="stub", subject="anonymous")
+async def get_auth_context(auth_context: AuthContext = Depends(authenticate_request)) -> AuthContext:
+    return auth_context
