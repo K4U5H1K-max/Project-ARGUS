@@ -18,6 +18,8 @@ from app.api.routes.compliance import router as compliance_router
 from app.api.routes.notifications import router as notifications_router
 from app.vision.api.routes import router as vision_router
 from app.predictive.api.routes import router as predictive_router
+from app.enterprise.api.routes import router as enterprise_router
+from app.analytics.api.routes import router as analytics_router
 api_router = APIRouter()
 api_router.include_router(health_router)
 api_router.include_router(graph_router)
@@ -34,3 +36,5 @@ api_router.include_router(compliance_router)
 api_router.include_router(notifications_router)
 api_router.include_router(vision_router)
 api_router.include_router(predictive_router)
+api_router.include_router(enterprise_router)
+api_router.include_router(analytics_router)
