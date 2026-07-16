@@ -1,18 +1,28 @@
 import React, { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Environment } from '@react-three/drei'
+import { OrbitControls } from '@react-three/drei'
 import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing'
 import { useStore } from '../../store/useStore'
 import FactoryModel from './FactoryModel'
 import Lighting from './Lighting'
 import CameraRig from './CameraRig'
+import * as THREE from 'three'
 
 export default function SceneContainer() {
   const groupRef = useRef()
   const progress = useStore((state) => state.progress)
+  const view = useStore((state) => state.view)
+  const activeTab = useStore((state) => state.activeTab)
 
   useFrame((state) => {
     if (groupRef.current) {
+      // Disable mouse-pointer parallax when manually orbiting in dashboard view
+      if (view === 'dashboard' && activeTab === 'twin') {
+        groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, 0, 0.05)
+        groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, 0, 0.05)
+        return
+      }
+
       // Subtle cinematic rotation parallax
       const targetX = (state.pointer.x * Math.PI) / 60;
       const targetY = (state.pointer.y * Math.PI) / 60;
@@ -23,8 +33,7 @@ export default function SceneContainer() {
   })
 
   // Cinematic fog logic (Dark and moody)
-  const fogColor = progress > 0.5 ? '#060B12' : '#040506'
-  const fogDensity = progress > 0.85 ? 0.01 : 0.025
+  const fogColor = view === 'dashboard' ? '#0A0B0D' : (progress > 0.5 ? '#060B12' : '#040506')
 
   return (
     <>
@@ -37,11 +46,22 @@ export default function SceneContainer() {
         <FactoryModel />
       </group>
 
+      {/* Render OrbitControls only when inspecting the 3D twin inside Mission Control */}
+      {view === 'dashboard' && activeTab === 'twin' && (
+        <OrbitControls 
+          enableDamping 
+          dampingFactor={0.05} 
+          minDistance={8} 
+          maxDistance={35} 
+          maxPolarAngle={Math.PI / 2 - 0.05} /* Prevent camera going below platform base */
+        />
+      )}
+
       <EffectComposer disableNormalPass multisampling={4}>
         <Bloom 
           luminanceThreshold={0.5} 
           luminanceSmoothing={0.9} 
-          intensity={progress > 0.4 ? 1.8 : 0.8} 
+          intensity={view === 'dashboard' ? 1.2 : (progress > 0.4 ? 1.8 : 0.8)} 
           mipmapBlur 
         />
         <Vignette eskil={false} offset={0.1} darkness={1.2} />

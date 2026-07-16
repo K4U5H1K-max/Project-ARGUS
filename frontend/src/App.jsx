@@ -3,10 +3,12 @@ import Lenis from 'lenis'
 import { Canvas } from '@react-three/fiber'
 import { useStore } from './store/useStore'
 import Overlay from './components/dom/Overlay'
+import MissionControl from './components/dom/MissionControl'
 import SceneContainer from './components/webgl/SceneContainer'
 
 export default function App() {
   const setProgress = useStore((state) => state.setProgress)
+  const view = useStore((state) => state.view)
 
   useEffect(() => {
     const lenis = new Lenis({
@@ -45,15 +47,20 @@ export default function App() {
           gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}
           dpr={[1, 2]}
         >
-          <color attach="background" args={['#0F1012']} />
+          <color attach="background" args={['#0A0B0D']} />
           <SceneContainer />
         </Canvas>
       </div>
       
-      {/* Scrollable area to drive progress. 2500vh gives ~80-90 seconds of slow cinematic scrolling */}
-      <div style={{ height: '2500vh', position: 'relative', zIndex: 1 }}>
-        <Overlay />
-      </div>
+      {view === 'briefing' ? (
+        /* Scrollable area to drive progress. 2500vh gives ~80-90 seconds of slow cinematic scrolling */
+        <div style={{ height: '2500vh', position: 'relative', zIndex: 1 }}>
+          <Overlay />
+        </div>
+      ) : (
+        /* Mission Control dashboard terminal initialization screen */
+        <MissionControl />
+      )}
     </>
   )
 }
